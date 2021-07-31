@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 interface IERC1155 is IERC165 {
     event TransferSingle(
@@ -132,7 +133,23 @@ contract ERC1155 is IERC1155 {
 
         emit TransferSingle(msg.sender, from, to, id, amount);
         if (isContract(to)) {
-            //do something
+            try
+                IERC1155Receiver(to).onERC1155Received(
+                    msg.sender,
+                    from,
+                    id,
+                    amount,
+                    data
+                )
+            returns (bytes4 response) {
+                if (response != IERC1155Receiver.onERC1155Received.selector) {
+                    revert("ERC1155Receiver rejected tokens :(");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            } catch {
+                revert("You can't transfer to non ERC1155Receiver contract");
+            }
         }
     }
 
@@ -161,6 +178,27 @@ contract ERC1155 is IERC1155 {
             balances[to][ids[i]] += amounts[i];
         }
         emit TransferBatch(msg.sender, from, to, ids, amounts);
+        if (isContract(to)) {
+            try
+                IERC1155Receiver(to).onERC1155BatchReceived(
+                    msg.sender,
+                    from,
+                    ids,
+                    amounts,
+                    data
+                )
+            returns (bytes4 response) {
+                if (
+                    response != IERC1155Receiver.onERC1155BatchReceived.selector
+                ) {
+                    revert("ERC1155Receiver rejected tokens :(");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            } catch {
+                revert("You can't transfer to non ERC1155Receiver contract");
+            }
+        }
     }
 
     function mint(uint256 amount) public {
