@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 interface IERC1155 is IERC165 {
@@ -60,10 +60,16 @@ interface IERC1155 is IERC165 {
 }
 
 contract ERC1155 is IERC1155 {
+    string public baseUri = "";
+    uint256 public lastId = 1;
     //address => tokenId => amount
     mapping(address => mapping(uint256 => uint256)) public balances;
     //real owner => account => is allowed to spend owners balance? yes | no
     mapping(address => mapping(address => bool)) public approvals;
+
+    constructor(string memory uri) {
+        baseUri = uri;
+    }
 
     function balanceOf(address account, uint256 id)
         public
@@ -84,11 +90,11 @@ contract ERC1155 is IERC1155 {
             accounts.length == ids.length,
             "The length of ids needs to be equal to length of ammounts"
         );
-        uint256[] memory balances = new uint256[](accounts.length);
+        uint256[] memory batchBalances = new uint256[](accounts.length);
         for (uint256 i = 0; i <= accounts.length; i++) {
-            balances[i] = balanceOf(accounts[i], ids[i]);
+            batchBalances[i] = balanceOf(accounts[i], ids[i]);
         }
-        return balances;
+        return batchBalances;
     }
 
     function setApprovalForAll(address operator, bool approved)
@@ -96,6 +102,7 @@ contract ERC1155 is IERC1155 {
         override
     {
         approvals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     function isApprovedForAll(address account, address operator)
@@ -112,7 +119,7 @@ contract ERC1155 is IERC1155 {
         address to,
         uint256 id,
         uint256 amount,
-        bytes calldata data
+        bytes memory data
     ) public override {
         require(to != address(0), "You can't make a transfer to address 0");
         require(
@@ -154,6 +161,20 @@ contract ERC1155 is IERC1155 {
             balances[to][ids[i]] += amounts[i];
         }
         emit TransferBatch(msg.sender, from, to, ids, amounts);
+    }
+
+    function mint(uint256 amount) public {
+        balances[msg.sender][lastId] = amount;
+        lastId++;
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return interfaceId == type(IERC1155).interfaceId;
     }
 
     function isContract(address _address) private returns (bool) {
